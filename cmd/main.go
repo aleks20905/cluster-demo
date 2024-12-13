@@ -26,7 +26,7 @@ func init() {
 	// Get the database file path from the RAILWAY_VOLUME_MOUNT_PATH environment variable
 	volumePath := os.Getenv("RAILWAY_VOLUME_MOUNT_PATH")
 	if volumePath == "" {
-		log.Fatal("RAILWAY_VOLUME_MOUNT_PATH environment variable is not set")
+		log.Fatal("RAILWAY_VOLUME_MOUNT_PATH environment variable is not set", volumePath)
 	}
 
 	// Define the path to the SQLite database file within the volume
