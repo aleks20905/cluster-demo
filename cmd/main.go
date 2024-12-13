@@ -12,10 +12,19 @@ import (
 	"gorm.io/gorm"
 )
 
-var Environment = "development"
+var Environment string
 
 func init() {
-	os.Setenv("env", Environment)
+	env := os.Getenv("ENV")
+	if env == "" {
+		Environment = "development"
+		os.Setenv("ENV", Environment)
+	} else {
+		Environment = env
+		os.Setenv("ENV", Environment)
+	}
+
+	log.Printf("Running in %s environment", Environment)
 }
 
 // User struct now works with GORM annotations for ORM mapping
@@ -57,7 +66,7 @@ func main() {
 	uh := userHandler{}
 	http.Handle("/users", uh)
 	log.Println("Server is running on port 8080")
-	log.Println("Server is running on ", os.Getenv("env"))
+	log.Println("Server is running on ", os.Getenv("ENV"))
 	http.ListenAndServe(":8080", nil)
 }
 
