@@ -24,8 +24,6 @@ WORKDIR /app
 
 COPY --from=builder /build/bin/userapi ./userapi
 
-VOLUME ["/app/db"]
-
 EXPOSE 8080
 
 CMD ["/app/userapi"]
