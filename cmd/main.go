@@ -2,8 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -20,8 +22,18 @@ var db *gorm.DB
 // init function to initialize the database
 func init() {
 	var err error
-	// Connect to SQLite database using GORM
-	db, err = gorm.Open(sqlite.Open("test.db"), &gorm.Config{})
+
+	// Get the database file path from the RAILWAY_VOLUME_MOUNT_PATH environment variable
+	volumePath := os.Getenv("RAILWAY_VOLUME_MOUNT_PATH")
+	if volumePath == "" {
+		log.Fatal("RAILWAY_VOLUME_MOUNT_PATH environment variable is not set")
+	}
+
+	// Define the path to the SQLite database file within the volume
+	dbFilePath := fmt.Sprintf("%s/db.sqlite", volumePath)
+
+	// Open SQLite connection using the full file path
+	db, err = gorm.Open(sqlite.Open(dbFilePath), &gorm.Config{})
 	if err != nil {
 		log.Fatal("Failed to connect to database:", err)
 	}
@@ -41,14 +53,6 @@ func init() {
 		}
 		db.Create(&users)
 	}
-
-	// Add some initial users
-	users := []User{
-		{Name: "Davida123"},
-		{Name: "Brian123"},
-		{Name: "Jeffaj124"},
-	}
-	db.Create(&users)
 }
 
 func main() {
