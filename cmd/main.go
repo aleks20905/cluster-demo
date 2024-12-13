@@ -12,6 +12,12 @@ import (
 	"gorm.io/gorm"
 )
 
+var Environment = "development"
+
+func init() {
+	os.Setenv("env", Environment)
+}
+
 // User struct now works with GORM annotations for ORM mapping
 type User struct {
 	ID   int    `json:"id" gorm:"primaryKey"`
@@ -51,6 +57,7 @@ func main() {
 	uh := userHandler{}
 	http.Handle("/users", uh)
 	log.Println("Server is running on port 8080")
+	log.Println("Server is running on ", os.Getenv("env"))
 	http.ListenAndServe(":8080", nil)
 }
 
