@@ -2,12 +2,13 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
 
-	"gorm.io/driver/sqlite"
+	// "gorm.io/driver/sqlite"
+
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
@@ -23,17 +24,8 @@ var db *gorm.DB
 func init() {
 	var err error
 
-	// Get the database file path from the RAILWAY_VOLUME_MOUNT_PATH environment variable
-	volumePath := os.Getenv("RAILWAY_VOLUME_MOUNT_PATH")
-	if volumePath == "" {
-		log.Fatal("RAILWAY_VOLUME_MOUNT_PATH environment variable is not set", volumePath)
-	}
-
-	// Define the path to the SQLite database file within the volume
-	dbFilePath := fmt.Sprintf("%s/db.sqlite", volumePath)
-
-	// Open SQLite connection using the full file path
-	db, err = gorm.Open(sqlite.Open(dbFilePath), &gorm.Config{})
+	dsn := os.Getenv("DATABASE_URL")
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		log.Fatal("Failed to connect to database:", err)
 	}
