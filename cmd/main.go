@@ -1,94 +1,70 @@
 package main
 
 import (
-	"encoding/json"
 	"log"
-	"net/http"
+	"os"
 
+	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
-// User struct now works with GORM annotations for ORM mapping
+// Define your User struct (must match your SQLite and PostgreSQL schema)
 type User struct {
 	ID   int    `json:"id" gorm:"primaryKey"`
 	Name string `json:"name"`
 }
 
-var db *gorm.DB
-
-// init function to initialize the database
-func init() {
-	var err error
-	// Connect to SQLite database using GORM
-	db, err = gorm.Open(sqlite.Open("test.db"), &gorm.Config{})
-	if err != nil {
-		log.Fatal("Failed to connect to database:", err)
-	}
-
-	// Auto-migrate the User struct to create users table
-	db.AutoMigrate(&User{})
-
-	// Optionally seed initial users if the table is empty
-	var count int64
-	db.Model(&User{}).Count(&count)
-	if count == 0 {
-		// Add some initial users
-		users := []User{
-			{Name: "Davida123"},
-			{Name: "Brianabc"},
-			{Name: "Jeff"},
-		}
-		db.Create(&users)
-	}
-
-	// Add some initial users
-	users := []User{
-		{Name: "Davida123"},
-		{Name: "Brian123"},
-		{Name: "Jeffaj124"},
-	}
-	db.Create(&users)
-}
-
 func main() {
-	uh := userHandler{}
-	http.Handle("/users", uh)
-	log.Println("Server is running on port 8080")
-	http.ListenAndServe(":8080", nil)
-}
-
-type userHandler struct{}
-
-func (uh userHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case "GET":
-		getUsers(w, r)
-	default:
-		w.Header().Set("Allow", "GET")
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-	}
-}
-
-// getUsers now retrieves data from the database using GORM
-func getUsers(w http.ResponseWriter, r *http.Request) {
-	var users []User
-	// Fetch all users from the database
-	result := db.Find(&users)
-	if result.Error != nil {
-		http.Error(w, result.Error.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// Convert the users to JSON
-	b, err := json.Marshal(users)
+	// 1. Connect to the SQLite database
+	sqliteDB, err := gorm.Open(sqlite.Open("test.db"), &gorm.Config{})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		log.Fatal("Failed to connect to SQLite database:", err)
 	}
 
-	// Write the response as JSON
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write(b)
+	// 2. Connect to the PostgreSQL database
+	// Replace the DSN below with your actual PostgreSQL connection string
+	postgresDSN := os.Getenv("postgresDSN")
+	postgresDB, err := gorm.Open(postgres.Open(postgresDSN), &gorm.Config{})
+	if err != nil {
+		log.Fatal("Failed to connect to PostgreSQL database:", err)
+	}
+
+	// Ensure PostgreSQL database has the same schema by migrating
+	err = postgresDB.AutoMigrate(&User{})
+	if err != nil {
+		log.Fatal("Failed to migrate PostgreSQL schema:", err)
+	}
+
+	// 3. Retrieve all records from the SQLite database
+	var users []User
+	if err := sqliteDB.Find(&users).Error; err != nil {
+		log.Fatal("Failed to retrieve data from SQLite:", err)
+	}
+
+	log.Printf("Found %d users in SQLite", len(users))
+
+	// 4. Insert the data into PostgreSQL, update on conflict
+	if len(users) > 0 {
+		// Use transaction for safe inserts
+		tx := postgresDB.Begin()
+
+		for _, user := range users {
+			// Insert each user, updating any records with the same ID
+			if err := tx.Clauses(clause.OnConflict{
+				Columns:   []clause.Column{{Name: "id"}},              // Define the conflict target (primary key)
+				DoUpdates: clause.AssignmentColumns([]string{"name"}), // Update only the 'name' column on conflict
+			}).Create(&user).Error; err != nil {
+				tx.Rollback() // Rollback in case of any error
+				log.Fatal("Failed to insert or update data in PostgreSQL:", err)
+			}
+		}
+
+		tx.Commit() // Commit the transaction if all goes well
+		log.Println("Successfully migrated data to PostgreSQL with upserts!")
+	} else {
+		log.Println("No users to migrate.")
+	}
+
 }
